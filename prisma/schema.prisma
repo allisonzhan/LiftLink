@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String          @id @default(cuid())
+  email           String          @unique
+  passwordHash    String
+  name            String?
+  displayName     String?
+  gender          String
+  age             Int
+  university      String          @default("unknown") // e.g., "vt", "gmu", "nvcc"
+  experienceLevel String          // Beginner, Intermediate, Advanced
+  fitnessTags     String          @default("[]") // JSON array stored as string
+  bio             String?
+  additionalInfo  String?         // JSON object: { prs: {...}, preferredTimes: [...], etc }
+  profilePhoto    String?
+  verified        Boolean         @default(false)
+  verificationToken String?       @unique
+  phoneNumber     String?
+  showProfileToSameGenderOnly Boolean @default(false) // If true, only show profile to same gender
+  viewSameGenderOnly Boolean      @default(false) // If true, only view profiles of same gender
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  // Relations
+  gymPosts        GymPost[]
+  sentRequests    InterestRequest[] @relation("SentRequests")
+  receivedRequests InterestRequest[] @relation("ReceivedRequests")
+  
+  @@index([university])
+}
+
+model GymPost {
+  id                String          @id @default(cuid())
+  creatorId         String
+  creator           User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  title             String
+  workoutType       String          @default("[]") // JSON array stored as string
+  gymLocation       String
+  dateTime          DateTime
+  partySize         Int             // 1-5
+  genderPreference  String?         // Optional
+  experiencePreference String?      // Optional
+  sameGenderOnly    Boolean         @default(false) // If true, only show to same gender
+  additionalNotes   String?
+  university        String          @default("unknown") // e.g., "vt", "gmu", "nvcc"
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  // Relations
+  requests          InterestRequest[]
+  
+  @@index([university])
+}
+
+model InterestRequest {
+  id                String          @id @default(cuid())
+  senderId          String
+  sender            User            @relation("SentRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId       String?
+  receiver         User?            @relation("ReceivedRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+  gymPostId        String?
+  gymPost          GymPost?         @relation(fields: [gymPostId], references: [id], onDelete: Cascade)
+  status            String          @default("pending") // pending, accepted, rejected
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
