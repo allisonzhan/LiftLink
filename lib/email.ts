@@ -68,3 +68,72 @@ export async function sendVerificationEmail(email: string, code: string) {
   }
 }
 
+export async function sendRequestNotificationEmail(
+  receiverEmail: string,
+  senderName: string,
+  requestType: 'profile' | 'gym-session',
+  gymSessionTitle?: string
+) {
+  // If SMTP is not configured, log for development
+  if (!transporter || !process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log('⚠️  Email service not configured. Request notification would be sent to:', receiverEmail);
+    return { success: false, error: 'Email service not configured' };
+  }
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const requestTypeText = requestType === 'gym-session' ? 'gym session' : 'profile';
+  const gymSessionInfo = requestType === 'gym-session' && gymSessionTitle
+    ? `<p style="margin: 10px 0; padding: 12px; background-color: #fff7ed; border-left: 4px solid #f97316; border-radius: 4px;">
+         <strong>Gym Session:</strong> ${gymSessionTitle}
+       </p>`
+    : '';
+
+  console.log('📧 Attempting to send request notification email to:', receiverEmail);
+
+  try {
+    const info = await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: receiverEmail,
+      subject: `${senderName} sent you a request on LiftLink`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #f97316; margin: 0;">🐱 LiftLink</h1>
+          </div>
+          
+          <div style="background-color: #fff7ed; border: 2px solid #f97316; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #f97316; margin-top: 0;">New Request Received!</h2>
+            <p style="color: #333; font-size: 16px; line-height: 1.6;">
+              <strong>${senderName}</strong> has sent you a request${requestType === 'gym-session' ? ' to join their gym session' : ' to connect'}.
+            </p>
+            ${gymSessionInfo}
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${baseUrl}/app/requests" 
+               style="display: inline-block; background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+              View Request
+            </a>
+          </div>
+
+          <p style="color: #666; font-size: 14px; line-height: 1.6;">
+            Log in to your LiftLink account to accept or decline the request. You can also view all your requests in the Requests section.
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
+
+          <p style="color: #999; font-size: 12px; margin: 0;">
+            This is an automated notification from LiftLink. If you didn't expect this email, you can safely ignore it.
+          </p>
+        </div>
+      `,
+    });
+
+    console.log('✅ Request notification email sent successfully! Message ID:', info.messageId);
+    return { success: true, data: info };
+  } catch (error) {
+    console.error('❌ Error sending request notification email:', error);
+    return { success: false, error };
+  }
+}
+

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/utils';
+import { sendRequestNotificationEmail } from '@/lib/email';
 import { z } from 'zod';
 
 const createInterestSchema = z.object({
@@ -113,6 +114,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get sender and receiver info for email notification
+    const [sender, receiver, gymPost] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: user.id },
+        select: { displayName: true, name: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: receiverId },
+        select: { email: true },
+      }),
+      data.gymPostId
+        ? prisma.gymPost.findUnique({
+            where: { id: data.gymPostId },
+            select: { title: true },
+          })
+        : null,
+    ]);
+
     const interestRequest = await prisma.interestRequest.create({
       data: {
         senderId: user.id,
@@ -122,8 +141,27 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // TODO: Send email notification to receiver
-    // For MVP, we'll just return success
+    // Send email notification to receiver
+    if (receiver && receiver.email && sender) {
+      const senderName = sender.displayName || sender.name || 'Someone';
+      const requestType = data.gymPostId ? 'gym-session' : 'profile';
+      const gymSessionTitle = gymPost?.title;
+
+      console.log('📧 Sending request notification email to:', receiver.email);
+      const emailResult = await sendRequestNotificationEmail(
+        receiver.email,
+        senderName,
+        requestType,
+        gymSessionTitle
+      );
+
+      if (!emailResult.success) {
+        console.error('❌ Failed to send request notification email:', emailResult.error);
+        // Don't fail the request creation if email fails
+      } else {
+        console.log('✅ Request notification email sent successfully!');
+      }
+    }
 
     return NextResponse.json(interestRequest, { status: 201 });
   } catch (error) {
