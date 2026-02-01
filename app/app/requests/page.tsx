@@ -36,6 +36,8 @@ export default function RequestsPage() {
 
   useEffect(() => {
     fetchRequests();
+    // Notify parent layout to refresh request count when page loads
+    window.dispatchEvent(new CustomEvent('requestsUpdated'));
   }, [activeTab]);
 
   const fetchRequests = async () => {
@@ -75,6 +77,8 @@ export default function RequestsPage() {
           );
         }
         fetchRequests();
+        // Notify parent layout to refresh request count
+        window.dispatchEvent(new CustomEvent('requestsUpdated'));
       } else {
         alert('Failed to update request');
       }

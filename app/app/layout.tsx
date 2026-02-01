@@ -13,10 +13,30 @@ export default function AppLayout({
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   useEffect(() => {
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchPendingRequestsCount();
+      // Poll for new requests every 30 seconds
+      const interval = setInterval(fetchPendingRequestsCount, 30000);
+      
+      // Listen for requests updated event
+      const handleRequestsUpdated = () => {
+        fetchPendingRequestsCount();
+      };
+      window.addEventListener('requestsUpdated', handleRequestsUpdated);
+      
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('requestsUpdated', handleRequestsUpdated);
+      };
+    }
+  }, [user]);
 
   const fetchUser = async () => {
     try {
@@ -41,6 +61,18 @@ export default function AppLayout({
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/');
+  };
+
+  const fetchPendingRequestsCount = async () => {
+    try {
+      const response = await fetch('/api/interest/count');
+      if (response.ok) {
+        const data = await response.json();
+        setPendingRequestsCount(data.count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching pending requests count:', error);
+    }
   };
 
   if (loading) {
@@ -87,9 +119,14 @@ export default function AppLayout({
               </Link>
               <Link
                 href="/app/requests"
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors relative"
               >
                 Requests
+                {pendingRequestsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse shadow-lg">
+                    {pendingRequestsCount > 9 ? '9+' : pendingRequestsCount}
+                  </span>
+                )}
               </Link>
               <Link
                 href="/app/profile"
